@@ -108,7 +108,7 @@ public class TemplateHmacSpi extends MacSpi {
      */
     private static native void doFinal(byte[] ctx, byte[] normalKey, byte[] result);
 
-    private static native void fastHmac(byte[] normalKey, byte[] message, int offset, int length,
+    private static native boolean fastHmac(byte[] normalKey, byte[] message, int offset, int length,
             byte[] result);
 
     static {
@@ -242,7 +242,9 @@ public class TemplateHmacSpi extends MacSpi {
                 .withSinglePass((src, offset, length) -> {
                     assertInitialized();
                     final byte[] result = new byte[HASH_SIZE];
-                    fastHmac(baseState.normalKey, src, offset, length, result);
+                    if (!fastHmac(baseState.normalKey, src, offset, length, result)) {
+                        throw new RuntimeCryptoException("Unknown problem MACing data");
+                    }
                     baseState.reset();
                     return result;
                 });

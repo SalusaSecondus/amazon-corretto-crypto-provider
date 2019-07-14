@@ -377,7 +377,7 @@ JNIEXPORT void JNICALL Java_com_amazon_corretto_crypto_provider_AesCtrDrbg_resee
  * Method:    generate
  * Signature: (J[BII)V
  */
-JNIEXPORT void JNICALL Java_com_amazon_corretto_crypto_provider_AesCtrDrbg_generate(
+JNIEXPORT jboolean JNICALL Java_com_amazon_corretto_crypto_provider_AesCtrDrbg_generate(
         JNIEnv *pEnv, jclass, jlong ctx, jbyteArray byteArray, jint offset,
         jint length) {
     try {
@@ -398,8 +398,42 @@ JNIEXPORT void JNICALL Java_com_amazon_corretto_crypto_provider_AesCtrDrbg_gener
         }
     } catch (java_ex &ex) {
         ex.throw_to_java(pEnv);
+        return false;
     }
+    return true;
 }
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+JNIEXPORT jboolean JNICALL JavaCritical_com_amazon_corretto_crypto_provider_AesCtrDrbg_generate(
+        jlong ctx,
+        jint ignoredLength,
+        jbyte* byteArray, jint offset, jint length) {
+    try {
+        // TODO: Remove me. This is just to find from the tests that we reached this method at all
+        printf("In RNG critical native method!\n");
+        if (unlikely(!ctx)) {
+            throw java_ex(EX_NPE, "Context must not be null");
+        }
+
+        aes_256_drbg* state = (aes_256_drbg*) ctx;
+
+        uint8_t* bytes = reinterpret_cast<uint8_t*>(byteArray + offset);
+
+        if (!state->generateRandomBytes(bytes, length)) {
+            secureZero(bytes, length);
+            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Failed to generate random bytes");
+        }
+    } catch (java_ex &ex) {
+        // We cannot throw Java exceptions from within a native critical method and so simply return false.
+        return false;
+    }
+    return true;
+}
+#ifdef __cplusplus
+}
+#endif
 
 /*
  * Class:     com_amazon_corretto_crypto_provider_AesCtrDrbg

@@ -23,10 +23,16 @@
 #include "env.h"
 #include "util.h"
 #include "buffer.h"
+#include "stdio.h"
 
 #define JNI_NAME(name) \
     CONCAT2( \
         CONCAT2(Java_com_amazon_corretto_crypto_provider_, DIGEST_NAME), \
+        CONCAT2(Spi_, name) \
+    )
+#define JNI_CRITICAL_NAME(name) \
+    CONCAT2( \
+        CONCAT2(JavaCritical_com_amazon_corretto_crypto_provider_, DIGEST_NAME), \
         CONCAT2(Spi_, name) \
     )
 
@@ -138,7 +144,7 @@ JNIEXPORT void JNICALL JNI_NAME(updateNativeByteBuffer)
     }
 }
 
-JNIEXPORT void JNICALL JNI_NAME(fastDigest)
+JNIEXPORT jboolean JNICALL JNI_NAME(fastDigest)
   (JNIEnv *pEnv, jclass, jbyteArray digestArray, jbyteArray dataArray, jint dataLength)
 {
     // As this method needs to be extremely high speed, we are omitting use of java_buffer
@@ -176,5 +182,55 @@ JNIEXPORT void JNICALL JNI_NAME(fastDigest)
 
     } catch (java_ex &ex) {
         ex.throw_to_java(pEnv);
+        return false;
     }
+    return true;
 }
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+JNIEXPORT jboolean
+JNICALL
+JNI_CRITICAL_NAME(fastDigest)
+  (
+      jint digestArrayLen,
+      jbyte* digestArray,
+      jint maxDataLength,
+      jbyte* dataArray,
+      jint dataLength)
+{
+
+    try {
+        SecureBuffer<CTX, 1> ctx;
+
+        if (unlikely(digestArrayLen < OP(DIGEST_LENGTH))) {
+            throw_java_ex(EX_ILLEGAL_ARGUMENT, "Bad digest array size");
+        }
+
+        if (unlikely(dataLength > maxDataLength)) {
+            throw_java_ex(EX_ILLEGAL_ARGUMENT, "Bad data length");
+        }
+
+        if (unlikely(!OP(Init)(ctx))) {
+            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to initialize context");
+        }
+
+        if (unlikely(!OP(Update)(ctx, dataArray, dataLength))) {
+            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to update context");
+        }
+
+        if (unlikely(!OP(Final)(reinterpret_cast<uint8_t*>(digestArray), ctx))) {
+            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to finish digest");
+        }
+
+    } catch (java_ex &ex) {
+        // We cannot throw Java exceptions from within a native critical method and so simply return false.
+        return false;
+    }
+    return true;
+}
+#ifdef __cplusplus
+}
+#endif

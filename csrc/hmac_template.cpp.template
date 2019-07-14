@@ -38,6 +38,12 @@
             CONCAT2(Spi_, name) \
             )
 
+#define JNI_CRITICAL_HMAC_NAME(name) \
+    CONCAT2( \
+            CONCAT2(JavaCritical_com_amazon_corretto_crypto_provider_Hmac, DIGEST_NAME), \
+            CONCAT2(Spi_, name) \
+            )
+
 using namespace AmazonCorrettoCryptoProvider;
 
 JNIEXPORT jint JNICALL JNI_HMAC_NAME(getContextSize)
@@ -179,7 +185,7 @@ JNIEXPORT void JNICALL JNI_HMAC_NAME(updateCtxBuffer)
     }
 }
 
-JNIEXPORT void JNICALL JNI_HMAC_NAME(fastHmac)
+JNIEXPORT jboolean JNICALL JNI_HMAC_NAME(fastHmac)
 (JNIEnv *pEnv, jclass, jbyteArray normalKeyArray, jbyteArray dataArray, jint offset, jint length, jbyteArray resultArray)
 {
     try {
@@ -218,5 +224,55 @@ JNIEXPORT void JNICALL JNI_HMAC_NAME(fastHmac)
         env->SetByteArrayRegion(resultArray, 0, OP(DIGEST_LENGTH), reinterpret_cast<jbyte *>(hash_result.buf));
     } catch (java_ex &ex) {
         ex.throw_to_java(pEnv);
+        return false;
     }
+    return true;
 }
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+JNIEXPORT jboolean JNICALL JNI_CRITICAL_HMAC_NAME(fastHmac)
+(jint normalKeyArrayLen,
+ jbyte* normalKeyArray,
+ jint dataArrayMaxLen,
+ jbyte* dataArray,
+ jint offset,
+ jint length,
+ jint resultArrayLen,
+ jbyte* resultArray)
+{
+    try {
+        SecureBuffer<CTX, 1> ctx;
+        SecureBuffer<uint8_t, DIGEST_BLOCK_SIZE> normalKey;
+        SecureBuffer<uint8_t, DIGEST_BLOCK_SIZE> ikey;
+        SecureBuffer<uint8_t, DIGEST_BLOCK_SIZE> okey;
+        SecureBuffer<uint8_t, OP(DIGEST_LENGTH)> inner_value;
+
+        // TODO: Check lengths? Should be trustworthy though
+        uint8_t* data = reinterpret_cast<uint8_t*>(dataArray + offset);
+        memcpy(normalKey.buf, normalKeyArray, DIGEST_BLOCK_SIZE);
+
+        calculateIkey(normalKey, ikey);
+        calculateOkey(normalKey, okey);
+
+        if (!likely(
+            OP(Init)(ctx) &&
+            OP(Update)(ctx, ikey.buf, sizeof(ikey.buf)) &&
+            OP(Update)(ctx, data, length) &&
+            OP(Final)(inner_value, ctx) &&
+            OP(Init)(ctx) &&
+            OP(Update)(ctx, okey.buf, sizeof(okey.buf)) &&
+            OP(Update)(ctx, inner_value.buf, sizeof(inner_value.buf)) &&
+            OP(Final)(reinterpret_cast<uint8_t*>(resultArray), ctx))) {
+            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unknown openssl error");
+        }
+
+    } catch (java_ex &ex) {
+        return false;
+    }
+    return true;
+}
+#ifdef __cplusplus
+}
+#endif
