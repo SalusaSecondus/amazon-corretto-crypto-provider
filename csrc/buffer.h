@@ -126,6 +126,21 @@ class java_buffer {
         }
 
         /**
+         * Constructs a java buffer representing an array passed into a JavaCritical method.
+         */
+        static java_buffer from_critical_array(jint true_length, jbyte* array, jint offset, jint length) {
+            if (unlikely(!::AmazonCorrettoCryptoProvider::check_bounds(true_length, offset, length))) {
+                throw java_ex("java/lang/ArrayIndexOutOfBoundsException", "Array offset is outside of array bounds");
+            }
+
+            java_buffer buf;
+            buf.m_direct_buffer = array + offset;
+            buf.m_offset = 0; // When handling raw pointers we just change the pointer and leave offset==0
+            buf.m_length = length;
+            return buf;
+        }
+
+        /**
          * Constructs a java buffer representing a slice of an array.
          *
          * If the passed pointer is not a byte array, or the offset and length point outside the

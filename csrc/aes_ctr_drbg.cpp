@@ -372,34 +372,65 @@ JNIEXPORT void JNICALL Java_com_amazon_corretto_crypto_provider_AesCtrDrbg_resee
     }
 }
 
+void generate_buffer(raii_env &env, aes_256_drbg* state, java_buffer &buffer) {
+    if (unlikely(!state)) {
+        throw java_ex(EX_NPE, "Context must not be null");
+    }
+
+    jni_borrow bytes(env, buffer, "bytes");
+
+    if (!state->generateRandomBytes(bytes, bytes.len())) {
+        bytes.zeroize();
+        throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Failed to generate random bytes");
+    }
+}
+
 /*
  * Class:     com_amazon_corretto_crypto_provider_AesCtrDrbg
  * Method:    generate
  * Signature: (J[BII)V
  */
-JNIEXPORT void JNICALL Java_com_amazon_corretto_crypto_provider_AesCtrDrbg_generate(
+JNIEXPORT jboolean JNICALL Java_com_amazon_corretto_crypto_provider_AesCtrDrbg_generate(
         JNIEnv *pEnv, jclass, jlong ctx, jbyteArray byteArray, jint offset,
         jint length) {
     try {
         raii_env env(pEnv);
 
-        if (unlikely(!ctx)) {
-            throw java_ex(EX_NPE, "Context must not be null");
-        }
+        java_buffer buffer = java_buffer::from_array(env, byteArray, offset, length);
+        generate_buffer(env, reinterpret_cast<aes_256_drbg*>(ctx), buffer);
 
-        aes_256_drbg* state = (aes_256_drbg*) ctx;
-
-        java_buffer byteBuffer = java_buffer::from_array(env, byteArray, offset, length);
-        jni_borrow bytes(env, byteBuffer, "bytes");
-
-        if (!state->generateRandomBytes(bytes, length)) {
-            bytes.zeroize();
-            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Failed to generate random bytes");
-        }
     } catch (java_ex &ex) {
         ex.throw_to_java(pEnv);
+        return false;
     }
+    return true;
 }
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+JNIEXPORT jboolean JNICALL JavaCritical_com_amazon_corretto_crypto_provider_AesCtrDrbg_generate(
+        jlong ctx,
+        jint maxLen, jbyte* byteArray,
+        jint offset, jint length) {
+    try {
+        raii_env env(nullptr);
+
+        java_buffer buffer = java_buffer::from_critical_array(maxLen, byteArray, offset, length);
+        generate_buffer(env, reinterpret_cast<aes_256_drbg*>(ctx), buffer);
+
+    } catch (java_ex &ex) {
+        return false;
+    }
+    return true;
+}
+
+#ifdef __cplusplus
+}
+#endif
+
 
 /*
  * Class:     com_amazon_corretto_crypto_provider_AesCtrDrbg

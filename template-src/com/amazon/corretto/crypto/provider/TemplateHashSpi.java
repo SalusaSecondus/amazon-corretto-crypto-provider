@@ -44,7 +44,7 @@ public final class TemplateHashSpi extends MessageDigestSpi implements Cloneable
      * @param digest Output buffer - must have at least getHashSize() bytes
      * @param buf Input buffer
      */
-    static native void fastDigest(byte[] digest, byte[] buf, int bufLen);
+    static native boolean fastDigest(byte[] digest, byte[] buf, int bufLen);
 
     /**
      * @return The size of result hashes for this hash function
@@ -109,7 +109,9 @@ public final class TemplateHashSpi extends MessageDigestSpi implements Cloneable
                     offset = 0;
                 }
                 final byte[] result = new byte[HASH_SIZE];
-                fastDigest(result, src, src.length);
+                if (!fastDigest(result, src, src.length)) {
+                    throw new RuntimeCryptoException("Unexpected exception in critical code");
+                }
                 return result;
             })
             .withStateCloner((context) -> context.clone());

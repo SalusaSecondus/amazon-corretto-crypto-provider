@@ -1,6 +1,7 @@
 {
     global:
         Java_*;
+        JavaCritical_*;
         JNI_*;
         hook_*;
     local:

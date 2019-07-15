@@ -25,7 +25,7 @@ public class AesCtrDrbg extends SecureRandom {
 
     private static native void reseed(long ptr, byte[] seed);
 
-    private static native void generate(long ptr, byte[] bytes, int offset, int length);
+    private static native boolean generate(long ptr, byte[] bytes, int offset, int length);
 
     private static native void releaseState(long ptr);
 
@@ -144,7 +144,9 @@ public class AesCtrDrbg extends SecureRandom {
             while (offset < bytes.length) {
                 final int toGenerate = Math.min(MAX_SINGLE_REQUEST, bytes.length - offset);
                 final int currentOffset = offset;
-                getState().useVoid(ptr ->generate(ptr, bytes, currentOffset, toGenerate));
+                if (!getState().use(ptr ->generate(ptr, bytes, currentOffset, toGenerate))) {
+                    throw new RuntimeCryptoException("Unexpected exception in critical code");
+                }
                 offset += toGenerate;
             }
         }

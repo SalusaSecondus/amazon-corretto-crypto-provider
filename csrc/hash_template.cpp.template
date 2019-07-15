@@ -29,6 +29,11 @@
         CONCAT2(Java_com_amazon_corretto_crypto_provider_, DIGEST_NAME), \
         CONCAT2(Spi_, name) \
     )
+#define JNI_CRITICAL_NAME(name) \
+    CONCAT2( \
+        CONCAT2(JavaCritical_com_amazon_corretto_crypto_provider_, DIGEST_NAME), \
+        CONCAT2(Spi_, name) \
+    )
 
 #define OP(name) CONCAT2(DIGEST_NAME, CONCAT2(_, name))
 
@@ -138,7 +143,28 @@ JNIEXPORT void JNICALL JNI_NAME(updateNativeByteBuffer)
     }
 }
 
-JNIEXPORT void JNICALL JNI_NAME(fastDigest)
+static void buffer_fastDigest(raii_env &env, java_buffer &digestBuffer, java_buffer &dataBuffer) {
+    SecureBuffer<CTX, 1> ctx;
+    if (unlikely(!OP(Init)(ctx))) {
+        throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to initialize context");
+    }
+
+    {
+        jni_borrow dataBorrow(env, dataBuffer, "data");
+        if (unlikely(!OP(Update)(ctx, dataBorrow.data(), dataBorrow.len()))) {
+            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to update context");
+        }
+    }
+
+    {
+        jni_borrow digestBorrow(env, digestBuffer, "digest");
+        if (unlikely(!OP(Final)(digestBorrow.data(), ctx))) {
+            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to finish digest");
+        }
+    }
+}
+
+JNIEXPORT jboolean JNICALL JNI_NAME(fastDigest)
   (JNIEnv *pEnv, jclass, jbyteArray digestArray, jbyteArray dataArray, jint dataLength)
 {
     // As this method needs to be extremely high speed, we are omitting use of java_buffer
@@ -147,34 +173,43 @@ JNIEXPORT void JNICALL JNI_NAME(fastDigest)
     try {
         raii_env env(pEnv);
 
-        SecureBuffer<CTX, 1> ctx;
-        const size_t scratchSize = DIGEST_BLOCK_SIZE; // Size is arbitrarily chosen
-        SecureBuffer<uint8_t, OP(DIGEST_LENGTH)> digest;
+        java_buffer dataBuffer = java_buffer::from_array(env, dataArray, 0, dataLength);
+        java_buffer digestBuffer = java_buffer::from_array(env, digestArray, 0, OP(DIGEST_LENGTH));
 
-        if (unlikely(!OP(Init)(ctx))) {
-            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to initialize context");
-        }
-
-        if (static_cast<size_t>(dataLength) > scratchSize) {
-            java_buffer dataBuffer = java_buffer::from_array(env, dataArray, 0, dataLength);
-            jni_borrow dataBorrow(env, dataBuffer, "data");
-            if (unlikely(!OP(Update)(ctx, dataBorrow.data(), dataBorrow.len()))) {
-                throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to update context");
-            }
-        } else {
-            SecureBuffer<uint8_t, scratchSize> scratch;
-            env->GetByteArrayRegion(dataArray, 0, dataLength, reinterpret_cast<jbyte *>(scratch.buf));
-            if (unlikely(!OP(Update)(ctx, scratch, dataLength))) {
-                            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to update context");
-            }
-        }
-
-        if (unlikely(!OP(Final)(digest, ctx))) {
-            throw java_ex::from_openssl(EX_RUNTIME_CRYPTO, "Unable to finish digest");
-        }
-        env->SetByteArrayRegion(digestArray, 0, OP(DIGEST_LENGTH), reinterpret_cast<const jbyte *>(digest.buf));
+        buffer_fastDigest(env, digestBuffer, dataBuffer);
 
     } catch (java_ex &ex) {
         ex.throw_to_java(pEnv);
+        return false;
     }
+    return true;
 }
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+JNIEXPORT jboolean JNICALL JNI_CRITICAL_NAME(fastDigest)
+  (jint digestArrayMaxLen, jbyte* digestArray, jint dataArrayMaxLen, jbyte* dataArray, jint dataLength)
+{
+    // As this method needs to be extremely high speed, we are omitting use of java_buffer
+    // to avoid the extra JNI calls it requires. Instead we are trusting that dataLength
+    // is correct.
+    try {
+        raii_env env(nullptr);
+
+        java_buffer dataBuffer = java_buffer::from_critical_array(dataArrayMaxLen, dataArray, 0, dataLength);
+        java_buffer digestBuffer = java_buffer::from_critical_array(digestArrayMaxLen, digestArray, 0, OP(DIGEST_LENGTH));
+
+        buffer_fastDigest(env, digestBuffer, dataBuffer);
+
+    } catch (java_ex &ex) {
+        return false;
+    }
+    return true;
+}
+
+#ifdef __cplusplus
+}
+#endif
