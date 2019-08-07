@@ -5,11 +5,13 @@ package com.amazon.corretto.crypto.provider.test;
 
 import static com.amazon.corretto.crypto.provider.test.TestUtil.assertThrows;
 import static com.amazon.corretto.crypto.provider.test.TestUtil.sneakyConstruct;
+import static com.amazon.corretto.crypto.provider.test.TestUtil.sneakyGetField;
 import static com.amazon.corretto.crypto.provider.test.TestUtil.sneakyInvoke;
 import static com.amazon.corretto.crypto.provider.test.TestUtil.sneakyInvoke_int;
 import static org.junit.Assert.*;
 
 import java.io.OutputStream;
+import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -58,11 +60,68 @@ public class AccessibleByteArrayOutputStreamTest {
         byte[] expected = new byte[5];
         Arrays.fill(expected, (byte) 5);
         instance.write(expected);
-        assertArrayEquals(expected, sneakyInvoke(instance, "getDataBuffer"));
+        byte[] retrieved = sneakyInvoke(instance, "getDataBuffer"); // Purposefully holding a reference
+        assertArrayEquals(expected, retrieved);
         sneakyInvoke(instance, "reset");
-        assertEquals(0, ((byte[]) sneakyInvoke(instance, "getDataBuffer"))[0] );
+
+        assertEquals(0, retrieved[0]);
         instance.write(expected);
         assertArrayEquals(expected, sneakyInvoke(instance, "getDataBuffer"));
+    }
+
+    @Test
+    public void resetWithReuse() throws Throwable {
+        OutputStream instance = getInstance(2, 5);
+        byte[] expected = new byte[5];
+        Arrays.fill(expected, (byte) 5);
+        instance.write(expected);
+        byte[] retrieved = sneakyInvoke(instance, "getDataBuffer"); // Purposefully holding a reference
+        assertArrayEquals(expected, sneakyInvoke(instance, "getDataBuffer"));
+        sneakyInvoke(instance, "reset");
+
+        assertEquals(0, retrieved[0]);
+        instance.write(expected);
+        assertArrayEquals(expected, sneakyInvoke(instance, "getDataBuffer"));
+        // Ensures that the objects are the same
+        assertSame(retrieved, sneakyInvoke(instance, "getDataBuffer"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void resetWithoutReuse() throws Throwable {
+        OutputStream instance = getInstance(2, 5);
+        byte[] expected = new byte[5];
+        Arrays.fill(expected, (byte) 5);
+        instance.write(expected);
+        byte[] retrieved = sneakyInvoke(instance, "getDataBuffer"); // Purposefully holding a reference
+        assertArrayEquals(expected, sneakyInvoke(instance, "getDataBuffer"));
+        sneakyInvoke(instance, "reset");
+
+        // Clear the reference
+        ((SoftReference<byte[]>) sneakyGetField(instance, "bufForReuse")).clear();
+
+        assertEquals(0, retrieved[0]);
+        instance.write(expected);
+        assertArrayEquals(expected, sneakyInvoke(instance, "getDataBuffer"));
+        // Ensures that the objects are the same
+        assertNotSame(retrieved, sneakyInvoke(instance, "getDataBuffer"));
+    }
+
+    @Test
+    public void resetNotReusedDueToSize() throws Throwable {
+        OutputStream instance = getInstance(2, 1024);
+        byte[] expected = new byte[5];
+        Arrays.fill(expected, (byte) 5);
+        instance.write(expected);
+        byte[] retrieved = sneakyInvoke(instance, "getDataBuffer"); // Purposefully holding a reference
+        assertArrayEquals(expected, sneakyInvoke(instance, "getDataBuffer"));
+        sneakyInvoke(instance, "reset");
+
+        assertEquals(0, retrieved[0]);
+        byte[] expected2 = new byte[512];
+        Arrays.fill(expected2, (byte) 7);
+        instance.write(expected2);
+        assertArrayEquals(expected2, sneakyInvoke(instance, "getDataBuffer"));
     }
 
     @Test
@@ -101,6 +160,23 @@ public class AccessibleByteArrayOutputStreamTest {
         instance.write(expected2);
         assertArrayEquals(expected2, sneakyInvoke(instance, "getDataBuffer"));
         assertArrayEquals(expected, sneakyInvoke(cloned, "getDataBuffer"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void cloneClearsBufForReuse() throws Throwable {
+        OutputStream instance = getInstance(2, 5);
+        byte[] expected = new byte[5];
+        Arrays.fill(expected, (byte) 5);
+
+        instance.write(expected);
+        byte[] retrieved = sneakyInvoke(instance, "getDataBuffer"); // Purposefully holding a reference
+        sneakyInvoke(instance, "reset");
+
+        assertSame(retrieved, ((SoftReference<byte[]>) sneakyGetField(instance, "bufForReuse")).get());
+
+        OutputStream cloned = sneakyInvoke(instance, "clone");
+        assertNull(sneakyGetField(cloned, "bufForReuse"));
     }
 
     private static OutputStream getInstance(final Object... args) throws Throwable {

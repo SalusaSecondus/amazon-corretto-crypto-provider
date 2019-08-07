@@ -4,6 +4,7 @@
 package com.amazon.corretto.crypto.provider;
 
 import java.io.OutputStream;
+import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -22,6 +23,13 @@ class AccessibleByteArrayOutputStream extends OutputStream implements Cloneable 
     private final int limit;
     //@ spec_public
     private byte[] buf;
+
+    /**
+     * Holds onto our buffer for reuse when not currently being used. Uses a {@link SoftReference} so that it
+     * can be reclaimed by the garbage collector if needed.
+     */
+    private SoftReference<byte[]> bufForReuse = null;
+
     //@ spec_public
     private int count;
     //@ public invariant 0 <= count && count <= buf.length && buf.length <= limit;
@@ -67,6 +75,7 @@ class AccessibleByteArrayOutputStream extends OutputStream implements Cloneable 
         try {
             final AccessibleByteArrayOutputStream cloned = (AccessibleByteArrayOutputStream) super.clone();
             cloned.buf = buf.clone();
+            cloned.bufForReuse = null;
             return cloned;
         } catch (final CloneNotSupportedException ex) {
             throw new RuntimeCryptoException("Unexpected exception", ex);
@@ -146,6 +155,8 @@ class AccessibleByteArrayOutputStream extends OutputStream implements Cloneable 
     void reset() {
         Arrays.fill(buf, 0, count, (byte) 0);
         count = 0;
+        bufForReuse = new SoftReference<>(buf);
+        buf = Utils.EMPTY_ARRAY;
     }
 
     //@ normal_behavior
@@ -198,10 +209,14 @@ class AccessibleByteArrayOutputStream extends OutputStream implements Cloneable 
             throw new IllegalArgumentException(String.format("Exceeded capacity limit %d. Requested %d", limit,
                     newCapacity));
         }
+        if (newCapacity == 0) {
+            return;
+        }
+        reuseBufferIfPossible(newCapacity);
         if (newCapacity <= buf.length) {
             return;
         }
-        
+
         //@ use lemma_can_be_doubled(buf.length);
         final int predictedSize = Math.min(limit, buf.length << 1);
         final byte[] tmp = new byte[Math.max(predictedSize, newCapacity)];
@@ -209,5 +224,22 @@ class AccessibleByteArrayOutputStream extends OutputStream implements Cloneable 
         final byte[] toZeroize = buf;
         buf = tmp;
         Arrays.fill(toZeroize, (byte) 0);
+    }
+
+    private void reuseBufferIfPossible(final int newCapacity) {
+        if (bufForReuse == null) {
+            // Nothing to re-use
+            return;
+        }
+        byte[] result = bufForReuse.get();
+        // We always clear and free the reference because we'll recreate it later if we need to.
+        if (result != null) {
+            bufForReuse.clear();
+        }
+        bufForReuse = null;
+
+        if (result != null && result.length >= newCapacity) {
+            buf = result;
+        }
     }
 }
