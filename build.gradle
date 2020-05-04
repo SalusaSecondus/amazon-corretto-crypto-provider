@@ -378,16 +378,42 @@ task overkill {
     dependsOn test, test_extra_checks, test_integration, test_integration_extra_checks, dieharder_all
 }
 
+task dumpArtifacts {
+     dependsOn emptyJar
+
+     def jarBaseName = "AmazonCorrettoCryptoProvider.jar"
+     def x86Jar = "${System.env.CODEBUILD_SRC_DIR_x86_64}/${jarBaseName}"
+     def aarch64 = "${System.env.CODEBUILD_SRC_DIR_aarch64}/${jarBaseName}"
+     def srcJar = "${System.env.CODEBUILD_SRC_DIR_x86_64}/AmazonCorrettoCryptoProvider-sources.jar"
+     def docJar = "${System.env.CODEBUILD_SRC_DIR_x86_64}/AmazonCorrettoCryptoProvider-javadoc.jar"
+
+     println aarch64
+     println file(aarch64).file
+     println x86Jar
+     println file(x86Jar).file
+     println srcJar
+     println file(srcJar).file
+     println docJar
+     println file(docJar).file
+}
+
 
 if (project.hasProperty('mavenUser') && project.hasProperty('jcecertAlias')) {
-    publishing {
+   def jarBaseName = "AmazonCorrettoCryptoProvider.jar"
+   def x86Jar = "${System.env.CODEBUILD_SRC_DIR_x86_64}/${jarBaseName}"
+   def aarch64 = "${System.env.CODEBUILD_SRC_DIR_aarch64}/${jarBaseName}"
+   def srcJar = "${System.env.CODEBUILD_SRC_DIR_x86_64}/AmazonCorrettoCryptoProvider-sources.jar"
+   def docJar = "${System.env.CODEBUILD_SRC_DIR_x86_64}/AmazonCorrettoCryptoProvider-javadoc.jar"
+
+   publishing {
         publications {
             mavenJava(MavenPublication) {
                 artifactId = project.name
-                artifact source: file("${buildDir}/lib/AmazonCorrettoCryptoProvider.jar"),classifier:"linux-x86_64",extension:"jar"
+                artifact source: file(x86Jar),classifier:"linux-x86_64",extension:"jar"
+                artifact source: file(aarch64),classifier:"linux-aarch_64",extension:"jar"
                 artifact emptyJar
-                artifact javadoc
-                artifact source: file("${buildDir}/lib/AmazonCorrettoCryptoProvider-sources.jar"),classifier:"sources",extension:"jar"
+                artifact source: file(docJar),classifier:"javadoc",extension:"jar"
+		artifact srcJar: file(srcJar),classifier:"sources",extension:"jar"
 
                 pom {
                     name = "Amazon Corretto Crypto Provider"
