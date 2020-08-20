@@ -167,17 +167,6 @@ final class Utils {
         return kf.generatePrivate(new PKCS8EncodedKeySpec(rawKey));
     }
 
-    static byte[] xor(final byte[] a, final byte[] b) {
-        if (a.length != b.length) {
-            throw new IllegalArgumentException("arrays must be the same length");
-        }
-        final byte[] result = new byte[a.length];
-        for (int x = 0; x < a.length; x++) {
-            result[x] = (byte) (a[x] ^ b[x]);
-        }
-        return result;
-    }
-
     static byte[] decodeHex(String hex) {
         if (hex.length() % 2 != 0) {
             throw new IllegalArgumentException("Input length must be even");
