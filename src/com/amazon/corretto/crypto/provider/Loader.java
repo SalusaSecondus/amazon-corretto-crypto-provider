@@ -166,14 +166,16 @@ final class Loader {
             LOG.log(Level.CONFIG, "Unable to load native library", error);
         }
 
-        // Finally start up a cleaning thread if necessary
+        // Finally start up some shared resources
         RESOURCE_JANITOR = new Janitor();
+        ARRAY_CACHE = new ArrayCache(ArrayCache.CACHE_SIZE, ArrayCache.CACHE_STEP_LIMIT, ArrayCache.MAX_ARRAY_SIZE);
     }
 
     static final boolean IS_AVAILABLE;
     static final Throwable LOADING_ERROR;
 
     static final Janitor RESOURCE_JANITOR;
+    static final ArrayCache ARRAY_CACHE;
 
     static void load() {
         // no-op - but we run the static block as a side effect

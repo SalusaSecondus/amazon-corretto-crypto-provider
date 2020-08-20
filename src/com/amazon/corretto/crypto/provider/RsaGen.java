@@ -3,6 +3,8 @@
 
 package com.amazon.corretto.crypto.provider;
 
+import static com.amazon.corretto.crypto.provider.Loader.ARRAY_CACHE;
+
 import java.math.BigInteger;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidParameterException;
@@ -60,19 +62,20 @@ class RsaGen extends KeyPairGeneratorSpi {
         // The modulus has a length equal to the keysize. An extra byte is allocated
         // to ensure that there are never any problems with sign-bits.
         // The private exponent may also be the key length.
-        final byte[] modOut = new byte[(keySize / 8) + 1];
-        final byte[] privExpOut = new byte[(keySize / 8) + 1];
+        final int keySizeBytes = (keySize / 8) + 1;
+        byte[] modOut = ARRAY_CACHE.getArray(keySizeBytes);
+        byte[] privExpOut = ARRAY_CACHE.getArray(keySizeBytes);
 
         // All subsequent parts are the lengths of the primes which are
         // each half as long as the modulus (which is their product).
         // Once again, an extra byte is allocated to avoid there are
         // never problems with sign-bits.
         final int partLen = (keySize / 16) + 1;
-        final byte[] primePOut = new byte[partLen];
-        final byte[] primeQOut = new byte[partLen];
-        final byte[] dmPOut = new byte[partLen];
-        final byte[] dmQOut = new byte[partLen];
-        final byte[] coefOut = new byte[partLen];
+        byte[] primePOut = ARRAY_CACHE.getArray(partLen);
+        byte[] primeQOut = ARRAY_CACHE.getArray(partLen);
+        byte[] dmPOut = ARRAY_CACHE.getArray(partLen);
+        byte[] dmQOut = ARRAY_CACHE.getArray(partLen);
+        byte[] coefOut = ARRAY_CACHE.getArray(partLen);
         generate(keySize, provider_.hasExtraCheck(ExtraCheck.KEY_PAIR_GENERATION_CONSISTENCY),
             pubExp, modOut, privExpOut, primePOut, primeQOut, dmPOut, dmQOut, coefOut);
 
@@ -89,6 +92,15 @@ class RsaGen extends KeyPairGeneratorSpi {
                     new BigInteger(dmPOut),
                     new BigInteger(dmQOut),
                     new BigInteger(coefOut)));
+
+            ARRAY_CACHE.offerArray(modOut); modOut = null;
+            ARRAY_CACHE.offerArray(privExpOut); privExpOut = null;
+            ARRAY_CACHE.offerArray(primePOut); primePOut = null;
+            ARRAY_CACHE.offerArray(primeQOut); primeQOut = null;
+            ARRAY_CACHE.offerArray(dmPOut); dmPOut = null;
+            ARRAY_CACHE.offerArray(dmQOut); dmQOut = null;
+            ARRAY_CACHE.offerArray(coefOut); coefOut = null;
+
             return new KeyPair(publicKey, privateKey);
         } catch (InvalidKeySpecException ex) {
             throw new AssertionError(ex);

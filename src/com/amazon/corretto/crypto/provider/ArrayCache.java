@@ -42,11 +42,9 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
  */
 class ArrayCache {
     // This must be a prime number.
-    private static final int CACHE_SIZE = Integer.parseInt(Loader.getProperty("arrayCacheSize", "127"));
-    private static final int CACHE_STEP_LIMIT = Integer.parseInt(Loader.getProperty("arrayCacheStepLimit", "16"));
-    private static final int MAX_ARRAY_SIZE = 1024;
-
-    public static final ArrayCache INSTANCE = new ArrayCache(CACHE_SIZE, CACHE_STEP_LIMIT, MAX_ARRAY_SIZE);
+    static final int CACHE_SIZE = Integer.parseInt(Loader.getProperty("arrayCacheSize", "127"));
+    static final int CACHE_STEP_LIMIT = Integer.parseInt(Loader.getProperty("arrayCacheStepLimit", "16"));
+    static final int MAX_ARRAY_SIZE = 1024;
 
     private static final class ThreadState {
         public final int stepSize;
@@ -67,7 +65,7 @@ class ArrayCache {
     private final AtomicReferenceArray<byte[]>[] caches;
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private ArrayCache(int cacheSize, int cacheStepLimit, int maxArraySize) {
+    ArrayCache(int cacheSize, int cacheStepLimit, int maxArraySize) {
         this.cacheSize = cacheSize;
         this.cacheStepLimit = cacheStepLimit;
         this.maxArraySize = maxArraySize;

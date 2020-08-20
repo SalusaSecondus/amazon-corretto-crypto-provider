@@ -3,6 +3,8 @@
 
 package com.amazon.corretto.crypto.provider;
 
+import static com.amazon.corretto.crypto.provider.Loader.ARRAY_CACHE;
+
 import java.math.BigInteger;
 import java.security.AlgorithmParameters;
 import java.security.NoSuchAlgorithmException;
@@ -31,13 +33,13 @@ final class EcUtils {
             final int[] m = new int[1];
             // 1024 bits is more than large enough for all of these values.
             // There is length checking on the native size.
-            final byte[] fieldBasis = new byte[128];
-            final byte[] a = new byte[128];
-            final byte[] b = new byte[128];
-            final byte[] cofactor = new byte[128];
-            final byte[] gx = new byte[128];
-            final byte[] gy = new byte[128];
-            final byte[] order = new byte[128];
+            byte[] fieldBasis = ARRAY_CACHE.getArray(128);
+            byte[] a = ARRAY_CACHE.getArray(128);
+            byte[] b = ARRAY_CACHE.getArray(128);
+            byte[] cofactor = ARRAY_CACHE.getArray(128);
+            byte[] gx = ARRAY_CACHE.getArray(128);
+            byte[] gy = ARRAY_CACHE.getArray(128);
+            byte[] order = ARRAY_CACHE.getArray(128);
             final BigInteger bnCofactor;
 
             final int nid = curveNameToInfo(normalizeName(curveName), m, fieldBasis, a, b,
@@ -61,13 +63,20 @@ final class EcUtils {
                     field = new ECFieldFp(new BigInteger(fieldBasis));
                 }
 
-                final EllipticCurve curve = new EllipticCurve(field, new BigInteger(a), new BigInteger(
-                        b));
+                final EllipticCurve curve = new EllipticCurve(field, new BigInteger(a), new BigInteger(b));
+
                 final ECPoint g = new ECPoint(new BigInteger(gx), new BigInteger(gy));
+
                 explicitSpec = new ECParameterSpec(curve, g, new BigInteger(order), bnCofactor.intValue());
             } else {
                 explicitSpec = null;
             }
+            ARRAY_CACHE.offerArray(fieldBasis); fieldBasis = null;
+            ARRAY_CACHE.offerArray(a); a = null;
+            ARRAY_CACHE.offerArray(b); b = null;
+            ARRAY_CACHE.offerArray(gx); gx = null;
+            ARRAY_CACHE.offerArray(gy); gy = null;
+            ARRAY_CACHE.offerArray(order); order = null;
 
             ECParameterSpec spec;
             try {

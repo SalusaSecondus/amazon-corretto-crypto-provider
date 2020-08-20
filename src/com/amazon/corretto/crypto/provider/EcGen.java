@@ -3,6 +3,8 @@
 
 package com.amazon.corretto.crypto.provider;
 
+import static com.amazon.corretto.crypto.provider.Loader.ARRAY_CACHE;
+
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.AlgorithmParameters;
@@ -102,9 +104,9 @@ class EcGen extends KeyPairGeneratorSpi {
         }
         // This will work for all curves up to unreasonably large sizes.
         // We do have bounds checking at the C++ level.
-        final byte[] x = new byte[128];
-        final byte[] y = new byte[128];
-        final byte[] s = new byte[128];
+        final byte[] x = ARRAY_CACHE.getArray(128);
+        final byte[] y = ARRAY_CACHE.getArray(128);
+        final byte[] s = ARRAY_CACHE.getArray(128);
 
         final boolean keyGenConsistency = provider_.hasExtraCheck(ExtraCheck.KEY_PAIR_GENERATION_CONSISTENCY);
         if (encodedSpec != null) {
@@ -120,6 +122,10 @@ class EcGen extends KeyPairGeneratorSpi {
         final ECPrivateKeySpec privSpec = new ECPrivateKeySpec(new BigInteger(s), spec);
         final ECPublicKeySpec pubSpec = new ECPublicKeySpec(w, spec);
         try {
+            ARRAY_CACHE.offerArray(x);
+            ARRAY_CACHE.offerArray(y);
+            ARRAY_CACHE.offerArray(s);
+
             return new KeyPair(keyFactory.generatePublic(pubSpec),
                     keyFactory.generatePrivate(privSpec));
         } catch (final InvalidKeySpecException ex) {

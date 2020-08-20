@@ -3,6 +3,8 @@
 
 package com.amazon.corretto.crypto.provider;
 
+import static com.amazon.corretto.crypto.provider.Loader.ARRAY_CACHE;
+
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
@@ -190,7 +192,7 @@ final class Utils {
             return arr;
         }
         final byte[] result = Arrays.copyOf(arr, len);
-        ArrayCache.INSTANCE.offerArray(arr);
+        ARRAY_CACHE.offerArray(arr);
         return result;
     }
 

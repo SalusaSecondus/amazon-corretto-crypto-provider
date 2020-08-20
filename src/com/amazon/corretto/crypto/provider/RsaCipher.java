@@ -3,6 +3,7 @@
 
 package com.amazon.corretto.crypto.provider;
 
+import static com.amazon.corretto.crypto.provider.Loader.ARRAY_CACHE;
 import static com.amazon.corretto.crypto.provider.Utils.EMPTY_ARRAY;
 
 import java.security.AlgorithmParameters;
@@ -142,7 +143,7 @@ class RsaCipher extends CipherSpi {
             throws IllegalBlockSizeException, BadPaddingException {
         synchronized (lock_) {
             assertInitialized();
-            final byte[] result = ArrayCache.INSTANCE.getArray(engineGetOutputSize(inputLen));
+            final byte[] result = ARRAY_CACHE.getArray(engineGetOutputSize(inputLen));
 
             try {
                 final int len = engineDoFinal(input, inputOffset, inputLen, result, 0);

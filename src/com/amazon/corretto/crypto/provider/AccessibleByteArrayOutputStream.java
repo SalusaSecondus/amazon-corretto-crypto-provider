@@ -3,6 +3,8 @@
 
 package com.amazon.corretto.crypto.provider;
 
+import static com.amazon.corretto.crypto.provider.Loader.ARRAY_CACHE;
+
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
@@ -50,7 +52,7 @@ class AccessibleByteArrayOutputStream extends OutputStream implements Cloneable 
         if (capacity < 0 || capacity > limit) {
             throw new IllegalArgumentException("Capacity must be non-negative and less than limit");
         }
-        buf = ArrayCache.INSTANCE.getArray(capacity);
+        buf = ARRAY_CACHE.getArray(capacity);
         this.limit = limit;
         count = 0;
     }
@@ -143,7 +145,7 @@ class AccessibleByteArrayOutputStream extends OutputStream implements Cloneable 
     //@   ensures count == 0;
     //@   // ensures (\forall int i; 0 <= i && i < \old(count); buf[i] == 0);
     void reset() {
-        ArrayCache.INSTANCE.offerArray(buf);
+        ARRAY_CACHE.offerArray(buf);
         buf = Utils.EMPTY_ARRAY;
         count = 0;
     }
@@ -204,9 +206,9 @@ class AccessibleByteArrayOutputStream extends OutputStream implements Cloneable 
         
         //@ use lemma_can_be_doubled(buf.length);
         final int predictedSize = Math.min(limit, buf.length << 1);
-        final byte[] tmp = ArrayCache.INSTANCE.getArray(Math.max(predictedSize, newCapacity));
+        final byte[] tmp = ARRAY_CACHE.getArray(Math.max(predictedSize, newCapacity));
         System.arraycopy(buf, 0, tmp, 0, buf.length);
-        ArrayCache.INSTANCE.offerArray(buf);
+        ARRAY_CACHE.offerArray(buf);
         buf = tmp;
     }
 }

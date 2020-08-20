@@ -3,6 +3,7 @@
 
 package com.amazon.corretto.crypto.provider;
 
+import static com.amazon.corretto.crypto.provider.Loader.ARRAY_CACHE;
 import static com.amazon.corretto.crypto.provider.Utils.EMPTY_ARRAY;
 
 import java.nio.ByteBuffer;
@@ -282,11 +283,13 @@ final class AesGcmSpi extends CipherSpi {
     protected synchronized void engineInit(int opMode, Key key, SecureRandom secureRandom) throws InvalidKeyException {
         if (opMode != Cipher.ENCRYPT_MODE && opMode != Cipher.WRAP_MODE) throw new InvalidKeyException("IV required for decrypt");
 
-        byte[] iv = new byte[12];
+        byte[] iv = ARRAY_CACHE.getArray(12);
         secureRandom.nextBytes(iv);
+        GCMParameterSpec spec = new GCMParameterSpec(DEFAULT_TAG_LENGTH, iv);
+        ARRAY_CACHE.offerArray(iv); iv = null;
 
         try {
-            engineInit(opMode, key, new GCMParameterSpec(DEFAULT_TAG_LENGTH, iv), secureRandom);
+            engineInit(opMode, key, spec, secureRandom);
         } catch (InvalidAlgorithmParameterException e) {
             throw new AssertionError(e);
         }
@@ -394,7 +397,7 @@ final class AesGcmSpi extends CipherSpi {
 
     @Override
     protected synchronized byte[] engineUpdate(byte[] bytes, int offset, int length) {
-        byte[] buf = ArrayCache.INSTANCE.getArray(getUpdateOutputSize(length));
+        byte[] buf = ARRAY_CACHE.getArray(getUpdateOutputSize(length));
 
         int actualLength;
         try {
@@ -479,10 +482,11 @@ final class AesGcmSpi extends CipherSpi {
         if (byteBuffer.hasArray()) {
             engineUpdateAAD(byteBuffer.array(), byteBuffer.arrayOffset() + byteBuffer.position(), byteBuffer.remaining());
         } else {
-            byte[] tmp = new byte[byteBuffer.remaining()];
+            byte[] tmp = ARRAY_CACHE.getArray(byteBuffer.remaining());
             byteBuffer.get(tmp);
 
             engineUpdateAAD(tmp, 0, tmp.length);
+            ARRAY_CACHE.offerArray(tmp); tmp = null;
         }
 
         byteBuffer.position(byteBuffer.limit());
@@ -492,7 +496,7 @@ final class AesGcmSpi extends CipherSpi {
     protected byte[] engineDoFinal(byte[] bytes, int offset, int length) throws IllegalBlockSizeException, BadPaddingException {
         if (bytes == null) bytes = EMPTY_ARRAY;
 
-        byte[] buf = ArrayCache.INSTANCE.getArray(engineGetOutputSize(length));
+        byte[] buf = ARRAY_CACHE.getArray(engineGetOutputSize(length));
 
         int actualLength;
         try {
