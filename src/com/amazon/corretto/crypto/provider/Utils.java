@@ -178,6 +178,22 @@ final class Utils {
         return result;
     }
 
+    /**
+     * If @{code arr.length == len} returns @{code arr} else returns an array of length
+     * @{code len} containing the first @{code len} bytes of @{code arr}.
+     *
+     * Note that @{code arr} may no longer be valid after calling this method and so must
+     * not be used again.
+     */
+    static byte[] maybeTrim(final byte[] arr, final int len) {
+        if (arr.length == len) {
+            return arr;
+        }
+        final byte[] result = Arrays.copyOf(arr, len);
+        ArrayCache.INSTANCE.offerArray(arr);
+        return result;
+    }
+
     private static void assertArrayEquals(String message, byte[] expected, byte[] actual) {
         if (!Arrays.equals(expected, actual)) {
             throw new AssertionError("Arrays do not match: " + message);

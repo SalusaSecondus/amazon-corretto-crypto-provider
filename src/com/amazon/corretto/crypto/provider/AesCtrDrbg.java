@@ -152,6 +152,8 @@ public class AesCtrDrbg extends SecureRandom {
         @Override
         protected void engineSetSeed(byte[] seed) {
             final byte[] actualSeed;
+            // We cannot use Utils.maybeTrim because that is allowed to return its input to the ArrayCache.
+            // Since the input here comes from a customer, we don't know if that is safe.
             if (seed.length != SEED_SIZE) {
                 actualSeed = Arrays.copyOf(seed, SEED_SIZE);
             } else {

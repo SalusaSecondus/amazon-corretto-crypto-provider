@@ -394,7 +394,7 @@ final class AesGcmSpi extends CipherSpi {
 
     @Override
     protected synchronized byte[] engineUpdate(byte[] bytes, int offset, int length) {
-        byte[] buf = new byte[getUpdateOutputSize(length)];
+        byte[] buf = ArrayCache.INSTANCE.getArray(getUpdateOutputSize(length));
 
         int actualLength;
         try {
@@ -403,11 +403,7 @@ final class AesGcmSpi extends CipherSpi {
             throw new AssertionError(e);
         }
 
-        if (actualLength == buf.length) {
-            return buf;
-        } else {
-            return Arrays.copyOf(buf, actualLength);
-        }
+        return Utils.maybeTrim(buf, actualLength);
     }
 
     @Override
@@ -496,7 +492,7 @@ final class AesGcmSpi extends CipherSpi {
     protected byte[] engineDoFinal(byte[] bytes, int offset, int length) throws IllegalBlockSizeException, BadPaddingException {
         if (bytes == null) bytes = EMPTY_ARRAY;
 
-        byte[] buf = new byte[engineGetOutputSize(length)];
+        byte[] buf = ArrayCache.INSTANCE.getArray(engineGetOutputSize(length));
 
         int actualLength;
         try {
@@ -505,11 +501,7 @@ final class AesGcmSpi extends CipherSpi {
             throw new AssertionError(e);
         }
 
-        if (actualLength == buf.length) {
-            return buf;
-        } else {
-            return Arrays.copyOf(buf, actualLength);
-        }
+        return Utils.maybeTrim(buf, actualLength);
     }
 
     @Override

@@ -142,16 +142,12 @@ class RsaCipher extends CipherSpi {
             throws IllegalBlockSizeException, BadPaddingException {
         synchronized (lock_) {
             assertInitialized();
-            final byte[] result = new byte[engineGetOutputSize(inputLen)];
+            final byte[] result = ArrayCache.INSTANCE.getArray(engineGetOutputSize(inputLen));
 
             try {
                 final int len = engineDoFinal(input, inputOffset, inputLen, result, 0);
 
-                if (len == result.length) {
-                    return result;
-                } else {
-                    return Arrays.copyOf(result, len);
-                }
+                return Utils.maybeTrim(result, len);
             } catch (final ShortBufferException ex) {
                 throw new AssertionError(ex);
             }
