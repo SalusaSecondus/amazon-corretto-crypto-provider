@@ -108,6 +108,7 @@ set(ACCP_SRC
         src/com/amazon/corretto/crypto/provider/AesCtrDrbg.java
         src/com/amazon/corretto/crypto/provider/AesGcmSpi.java
         src/com/amazon/corretto/crypto/provider/ArrayCache.java
+        src/com/amazon/corretto/crypto/provider/ConstantTime.java
         src/com/amazon/corretto/crypto/provider/EcGen.java
         src/com/amazon/corretto/crypto/provider/EvpKeyAgreement.java
         src/com/amazon/corretto/crypto/provider/EvpKeyType.java
@@ -530,6 +531,7 @@ add_jar(
         tst/com/amazon/corretto/crypto/provider/test/AesCtrDrbgTest.java
         tst/com/amazon/corretto/crypto/provider/test/AesTest.java
         tst/com/amazon/corretto/crypto/provider/test/ArrayCacheTest.java
+        tst/com/amazon/corretto/crypto/provider/test/ConstantTimeTests.java
         tst/com/amazon/corretto/crypto/provider/test/EcGenTest.java
         tst/com/amazon/corretto/crypto/provider/test/EvpKeyAgreementTest.java
         tst/com/amazon/corretto/crypto/provider/test/EvpKeyAgreementSpecificTest.java
