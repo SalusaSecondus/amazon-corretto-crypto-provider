@@ -14,6 +14,7 @@ import java.security.PublicKey;
 import java.security.SignatureException;
 import java.security.SignatureSpi;
 import java.security.interfaces.ECKey;
+import java.security.interfaces.RSAKey;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -177,13 +178,30 @@ abstract class EvpSignatureBase extends SignatureSpi {
      * @throws SignatureException if the signature is badly malformed
      */
     protected byte[] maybeConvertSignatureToVerify(byte[] signature, int offset, int length) throws SignatureException {
-        if (algorithmName_ != null && algorithmName_.endsWith(P1363_FORMAT_SUFFIX)) {
+        if (algorithmName_ == null) {
+            return null;
+        }
+
+        if (algorithmName_.endsWith(P1363_FORMAT_SUFFIX)) {
             final ECKey ecKey = (ECKey) key_;
             final int numLen = (ecKey.getParams().getOrder().bitLength() + 7) / 8;
             return ieeeP1363toAsn1(signature, offset, length, numLen);
-        } else {
-            return null;
         }
+
+        if (algorithmName_.endsWith("RSA")) {
+            // RSA signatures must be the same length as the underlying key
+            final RSAKey rsaKey = (RSAKey) key_;
+            final int numLen = (rsaKey.getModulus().bitLength() + 7) / 8;
+            if (length == numLen) {
+                return null;
+            } else {
+                final byte[] paddedSignature = new byte[numLen];
+                final int paddingLength = numLen - length;
+                System.arraycopy(signature, offset, paddedSignature, paddingLength, length);
+                return paddedSignature;
+            }
+        }
+        return null;
     }
 
     /**

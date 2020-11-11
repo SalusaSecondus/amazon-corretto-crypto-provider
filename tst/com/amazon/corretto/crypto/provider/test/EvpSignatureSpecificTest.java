@@ -6,6 +6,7 @@ package com.amazon.corretto.crypto.provider.test;
 import static com.amazon.corretto.crypto.provider.test.TestUtil.NATIVE_PROVIDER;
 import static com.amazon.corretto.crypto.provider.test.TestUtil.assertThrows;
 import static com.amazon.corretto.crypto.provider.test.TestUtil.assumeMinimumVersion;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,6 +23,7 @@ import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.Provider;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.interfaces.RSAPrivateKey;
@@ -30,6 +32,7 @@ import java.security.spec.ECGenParameterSpec;
 import java.security.spec.PSSParameterSpec;
 import java.security.spec.RSAKeyGenParameterSpec;
 import java.security.spec.RSAPrivateKeySpec;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -57,6 +60,7 @@ import javax.crypto.spec.SecretKeySpec;
 public class EvpSignatureSpecificTest {
     private static final BouncyCastleProvider BOUNCYCASTLE_PROVIDER = new BouncyCastleProvider();
     private static final byte[] MESSAGE = new byte[513];
+    private static final int RSA_KEYLENGTH = 2048;
     private final static KeyPair RSA_PAIR;
     private final static KeyPair DSA_PAIR;
     private final static KeyPair ECDSA_PAIR;
@@ -68,7 +72,7 @@ public class EvpSignatureSpecificTest {
 
         try {
             KeyPairGenerator kg = KeyPairGenerator.getInstance("RSA");
-            kg.initialize(new RSAKeyGenParameterSpec(2048, RSAKeyGenParameterSpec.F4));
+            kg.initialize(new RSAKeyGenParameterSpec(RSA_KEYLENGTH, RSAKeyGenParameterSpec.F4));
             RSA_PAIR = kg.generateKeyPair();
 
             kg = KeyPairGenerator.getInstance("EC");
@@ -101,6 +105,40 @@ public class EvpSignatureSpecificTest {
         } catch (final InvalidKeyException | SignatureException ex) {
             // Expected
         }
+    }
+
+    @Test
+    public void rsaShortSignature() throws Exception {
+        // RSA signatures must always generate a result of the same length as their modulus.
+        // 1/256 of the time the leading byte will be a 0, some implementations incorrectly
+        // trim it.
+        // This test ensures that we do not trim it.
+        // It also ensures that if we receive a signature such as this, we still accept it
+        // as it is not a security issue to do so.
+
+        // We don't know how long it will take, so have a high limit and short-circuit if possible.
+        final int expectedLength = (RSA_KEYLENGTH + 7) / 8;
+        final Signature signer = Signature.getInstance("SHA256withRSA", NATIVE_PROVIDER);
+        final Signature verifier = Signature.getInstance("SHA256withRSA", NATIVE_PROVIDER);
+        signer.initSign(RSA_PAIR.getPrivate());
+        verifier.initVerify(RSA_PAIR.getPublic());
+        // We need to randomize the messages to get different signatures as PKCS #1v1.5 signatures are deterministic
+        final byte[] message = new byte[16];
+        final SecureRandom insecureRandom = TestUtil.MISC_SECURE_RANDOM.get();
+        for (int trial = 0; trial < 2048; trial++) {
+            insecureRandom.nextBytes(message);
+            signer.update(message);
+            final byte[] signature = signer.sign();
+            assertEquals(signature.length, expectedLength, "ACCP returned a short signature");
+
+            if (signature[0] == 0) {
+                final byte[] shortSignature = Arrays.copyOfRange(signature, 1, signature.length);
+                verifier.update(message);
+                assertTrue(verifier.verify(shortSignature), "ACCP rejected short signature");
+                return; // Test complete
+            }
+        }
+        fail("Exceeded trial count");
     }
 
     @Test
