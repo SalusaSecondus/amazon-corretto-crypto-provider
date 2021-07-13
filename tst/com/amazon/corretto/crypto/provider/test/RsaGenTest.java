@@ -191,8 +191,8 @@ public class RsaGenTest {
         assertNotNull(pub.getModulus());
         assertEquals(pub.getModulus(), priv.getModulus());
         assertNotNull(priv.getPrivateExponent());
-        assertNotNull(priv.getPrimeExponentP());
-        assertNotNull(priv.getPrimeExponentQ());
+        assertNotNull(priv.getPrimeP());
+        assertNotNull(priv.getPrimeQ());
         assertNotNull(priv.getPrimeExponentP());
         assertNotNull(priv.getPrimeExponentQ());
         assertNotNull(priv.getCrtCoefficient());
@@ -202,6 +202,10 @@ public class RsaGenTest {
         assertEquals(priv.getPrivateExponent().mod(priv.getPrimeP().subtract(BigInteger.ONE)), priv.getPrimeExponentP());
         assertEquals(priv.getPrivateExponent().mod(priv.getPrimeQ().subtract(BigInteger.ONE)), priv.getPrimeExponentQ());
         assertEquals(priv.getPrimeQ().modInverse(priv.getPrimeP()), priv.getCrtCoefficient());
+        final BigInteger p1 = priv.getPrimeP().subtract(BigInteger.ONE);
+        final BigInteger q1 = priv.getPrimeQ().subtract(BigInteger.ONE);
+        final BigInteger totient = p1.multiply(q1);
+        assertEquals(priv.getPrivateExponent(), priv.getPublicExponent().modInverse(totient));
 
         // Actually use the key
         final Cipher cipher = Cipher.getInstance("RSA");
